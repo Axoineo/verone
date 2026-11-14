@@ -141,10 +141,12 @@ redroid's adb must be treated as an unauthenticated administrator door into the 
 - Locking stops the phone and closes the encrypted storage; hiding the window is not locking.
 - Auto-lock after a configurable idle time.
 - Backups are encrypted with the same scheme.
-- The encryption mechanism is *unverified* (assumption A-09). Android's data directory
-  needs normal Linux file ownership and attributes, which rules out some simple
-  approaches. Candidates: an encrypted disk image opened inside a helper container, or
-  native filesystem encryption.
+- Mechanism verified in Phase 0 (assumption A-09): an encrypted folder served by
+  gocryptfs running as root in a helper that shares the host's process namespace. It
+  needs only FUSE. An encrypted disk image (LUKS) is the alternative still to be
+  compared; it needs a kernel module that many desktops do not have loaded.
+- Contents and names are encrypted. Ownership, sizes and the shape of the folder tree
+  are not hidden.
 
 ## Google apps
 
@@ -163,7 +165,7 @@ redroid's adb must be treated as an unauthenticated administrator door into the 
 | Container runtime installed and usable | Show the install command for the user's distribution. |
 | Kernel binder support | Explain which kernel or module is needed. |
 | Running kernel matches installed kernel modules | Ask for a reboot (this exact fault occurred on 2026-11-13). |
-| Free disk space for image and data | Refuse to start and say how much is needed. |
+| Free disk space, checked separately where the runtime stores images and where phone data lives (these were different partitions on the reference machine) | Refuse to start and say how much is needed and where. |
 | Usable GPU for acceleration | Fall back to software rendering and say so. |
 | Free RAM | Warn, or suggest a smaller screen size. |
 | Webcam, microphone | Hide the related features. |

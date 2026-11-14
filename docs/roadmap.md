@@ -34,17 +34,18 @@ Packaging, user documentation and release work run inside every phase from Phase
 ## Phase 0 — Proof
 
 Purpose: replace guesses with measurements before any product code is written.
-Detailed steps: `docs/phases/phase-0.md` (to be written next).
+Detailed steps: [phases/phase-0.md](phases/phase-0.md).
 
-Owner prerequisite: Docker's storage must be moved to `/home`, because the root
-partition has under 3 GB free and one Android image needs about 3 GB.
+Owner prerequisite: at least 8 GB free on the root partition, where the container
+runtime stores images on the owner's laptop. One Android image needs about 3 GB.
 
 Work:
 
 - Test assumptions A-02, A-03, A-07, A-08, A-10, A-11, A-14 on the owner's laptop.
 - Test A-04, A-05, A-06, A-15 (Google apps path) with a throwaway Google account.
 - Test A-09 (encrypted storage) with at least two candidate mechanisms.
-- Research A-12 (binder on other distributions) and test on at least one non-Arch system.
+- Check A-12 (binder on other distributions) by inspecting their kernel packages; confirm
+  on a non-Arch system if one is available.
 - Check that the name "Verone" is free to use for software: trademark registers, package
   repositories, existing projects.
 - Record every result in `assumptions.md`.
