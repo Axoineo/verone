@@ -85,6 +85,9 @@ image `redroid/redroid:14.0.0-latest`):
 - The kernel's built-in binder driver is sufficient; no extra kernel module was needed.
 - A restart chosen inside Android stops the container (exit code 129). The engine must
   start it again automatically.
+- A power-off chosen inside Android stops it with exit code 130. The runtime's own
+  stop command does not shut Android down; it kills it after the grace period. The
+  engine stops a phone by powering Android off from inside.
 - Android fails to boot if its data location has no free space. `check_host` must test
   free space before starting.
 - The stock image is a `userdebug` build with test keys, an old-style launcher and no
