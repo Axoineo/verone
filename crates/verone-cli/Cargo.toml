@@ -1,0 +1,24 @@
+[package]
+name = "verone-cli"
+description = "The verone command-line tool"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "verone"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.6.7", features = ["derive"] }
+verone-core = { path = "../verone-core" }
+verone-engine-container = { path = "../verone-engine-container" }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+predicates = "3.1.4"
