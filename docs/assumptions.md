@@ -51,6 +51,25 @@ container stayed stopped for 30 s. Note for Phase 1: adb must be disconnected an
 reconnected after the container is recreated or restarted; a stale connection returns
 `error: closed` and the command is silently not run.
 
+**A-03 addendum: how the phone stops.** 2026-11-15, same laptop, measured while
+preparing the Phase 1 plan.
+
+| Action | Result |
+|---|---|
+| `docker stop` (10 s grace) | Android ignores the request; killed after 10.4 s, exit code 137 |
+| `docker stop -t 60` | killed after 60.4 s, exit code 137 |
+| `reboot -p` inside, restart policy `unless-stopped` or `on-failure` | container exits and the policy starts it again |
+| `docker update --restart no`, then `reboot -p` inside | exits in 0.9 s with exit code 130 and stays stopped |
+| `reboot` inside, restart policy `no` | exit code 129 |
+| Start again after the clean stop | boots in 11 s, marker file intact |
+| `svc power shutdown` inside | container still running after 40 s; not investigated |
+
+Design consequences: Verone never uses `docker stop`; it switches the restart policy
+off, powers Android off from inside and waits for exit code 130. Exit code 129 means
+"restart requested" and 130 means "power off requested"; Docker's restart policy
+cannot tell them apart, so until Verone supervises the phone itself (Phase 2), a
+power-off chosen inside Android comes back on.
+
 **A-04 pass.** 2026-11-15, reference laptop (test T-09, script
 `tests/phase-0/t09-gapps.sh`). The script does by hand what `redroid-script` (commit
 `a4951b7`) does for `-a 14.0.0 -mtg`: it downloads

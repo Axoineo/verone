@@ -56,6 +56,7 @@ approved a design change. Proposed decisions D-011 to D-014 are accepted or repl
 ## Phase 1 — Core and command line
 
 Purpose: the engine layer and a complete command-line tool. Everything later sits on this.
+Detailed tasks: [phases/phase-1.md](phases/phase-1.md).
 
 Deliverables:
 
@@ -65,6 +66,7 @@ Deliverables:
 - `verone open`: show a running phone using the system's scrcpy.
 - Image download with progress and checksum verification.
 - Automatic return after a restart requested inside Android.
+- Clean shutdown of Android on `verone stop` (the runtime's own stop only kills it).
 - adb reachable locally only; optional `127.0.0.1` port for IDEs.
 - Automated tests that boot a real phone.
 - Install instructions for Arch; first tagged release.
