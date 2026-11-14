@@ -12,14 +12,14 @@ work from it.
 | [architecture.md](architecture.md) | How Verone is put together. | Draft for owner review |
 | [roadmap.md](roadmap.md) | The phases, their outcomes and exit tests. | Draft for owner review |
 | [assumptions.md](assumptions.md) | What the design depends on, what has been tested, known risks. | Live register |
+| [phases/phase-0.md](phases/phase-0.md) | Step-by-step proof tests for Phase 0. | Ready for owner review |
 | [future-ideas.md](future-ideas.md) | Ideas not yet scheduled. Not to be built until approved. | Live backlog |
 
 ## Still to be written
 
 | Document | Written when |
 |---|---|
-| `phases/phase-0.md` — step-by-step proof tests | Next, once the drafts above are approved |
-| `phases/phase-N.md` — task lists per phase | Before each phase starts |
+| `phases/phase-N.md` — task lists for Phase 1 onwards | Before each phase starts |
 | `user-guide/` | During Phases 2 and 3 |
 | `developer-guide/` | During Phase 4 |
 | `CONTRIBUTING.md`, `SECURITY.md` (repository root) | During Phase 1 |
