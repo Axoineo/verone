@@ -1,0 +1,11 @@
+[package]
+name = "verone-core"
+description = "Core library for Verone: phones, storage, host checks and the engine interface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true

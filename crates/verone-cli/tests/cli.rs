@@ -1,0 +1,23 @@
+//! Tests that run the built `verone` binary.
+
+use assert_cmd::Command;
+use predicates::prelude::*;
+
+#[test]
+fn version_flag_prints_name_and_version() {
+    Command::cargo_bin("verone")
+        .unwrap()
+        .arg("--version")
+        .assert()
+        .success()
+        .stdout(predicate::eq("verone 0.1.0\n"));
+}
+
+#[test]
+fn unknown_argument_is_a_usage_error() {
+    Command::cargo_bin("verone")
+        .unwrap()
+        .arg("--no-such-option")
+        .assert()
+        .code(2);
+}
