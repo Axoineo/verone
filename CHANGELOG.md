@@ -32,3 +32,7 @@ All notable changes to Verone are recorded here. The format follows
   software rendering.
 - adb helper that drops stale connections and reconnects before every use.
 - `verone doctor`, `verone image pull` and `verone image list`.
+- Phone commands: `create`, `list`, `info`, `start`, `stop`, `restart`, `open`, `adb`,
+  `install`, `reset` and `delete`. `reset` and `delete` ask for confirmation unless
+  `--yes` is given.
+- End-to-end test script `tests/e2e/phase-1.sh` that runs every command on a real phone.

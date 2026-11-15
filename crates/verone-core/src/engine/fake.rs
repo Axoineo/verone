@@ -8,13 +8,21 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
-use super::{BootReport, Capabilities, ControlEndpoint, Engine, HostCheck, PhoneStatus};
+use super::{
+    BootReport, Capabilities, ControlEndpoint, Engine, HostCheck, PhoneDetails, PhoneStatus,
+};
 use crate::error::{Error, Result};
 use crate::profile::{EngineKind, GraphicsUsed, Profile};
 use crate::storage::{PhoneDir, PhoneId};
 
 /// The only Android version the fake engine has an image for.
 pub const FAKE_ANDROID: &str = "14";
+
+/// The data size the fake engine reports for every phone.
+pub const FAKE_DATA_BYTES: u64 = 300 * 1024 * 1024;
+
+/// The uptime the fake engine reports for a running phone.
+pub const FAKE_UPTIME: Duration = Duration::from_secs(3723);
 
 #[derive(Debug, Default)]
 struct Inner {
@@ -83,12 +91,6 @@ impl FakeEngine {
     }
 }
 
-fn not_created(id: &PhoneId) -> Error {
-    Error::not_found(format!(
-        "the phone '{id}' has not been created in the engine"
-    ))
-}
-
 impl Engine for FakeEngine {
     fn kind(&self) -> EngineKind {
         EngineKind::Container
@@ -126,9 +128,11 @@ impl Engine for FakeEngine {
 
     fn start(&self, profile: &Profile, _phone: &PhoneDir) -> Result<BootReport> {
         let mut inner = self.enter(format!("start {}", profile.id))?;
-        let Some(status) = inner.phones.get_mut(&profile.id) else {
-            return Err(not_created(&profile.id));
-        };
+        // Like the real engines, starting creates what is missing.
+        let status = inner
+            .phones
+            .entry(profile.id.clone())
+            .or_insert(PhoneStatus::Stopped);
         let already_running = *status == PhoneStatus::Running;
         *status = PhoneStatus::Running;
         Ok(BootReport {
@@ -145,13 +149,11 @@ impl Engine for FakeEngine {
 
     fn stop(&self, id: &PhoneId) -> Result<()> {
         let mut inner = self.enter(format!("stop {id}"))?;
-        match inner.phones.get_mut(id) {
-            Some(status) => {
-                *status = PhoneStatus::Stopped;
-                Ok(())
-            }
-            None => Err(not_created(id)),
+        // Stopping a phone that has nothing running is not an error.
+        if let Some(status) = inner.phones.get_mut(id) {
+            *status = PhoneStatus::Stopped;
         }
+        Ok(())
     }
 
     fn status(&self, id: &PhoneId) -> Result<PhoneStatus> {
@@ -170,9 +172,9 @@ impl Engine for FakeEngine {
                 host: "127.0.0.1".to_string(),
                 port: 5555,
             }),
-            Some(_) => Err(Error::failed(format!("the phone '{id}' is not running"))
+            // Stopped or never started: either way there is nothing to connect to.
+            _ => Err(Error::failed(format!("the phone '{id}' is not running"))
                 .with_hint(format!("Start it with: verone start {id}"))),
-            None => Err(not_created(id)),
         }
     }
 
@@ -182,6 +184,38 @@ impl Engine for FakeEngine {
             gpu_rendering: false,
             root_access: true,
             own_kernel: false,
+        })
+    }
+
+    fn supports_android(&self, android: &str) -> Result<()> {
+        let _inner = self.enter(format!("supports_android {android}"))?;
+        if android == FAKE_ANDROID {
+            Ok(())
+        } else {
+            Err(Error::not_found(format!(
+                "there is no image for Android {android}"
+            )))
+        }
+    }
+
+    fn erase_data(&self, phone: &PhoneDir) -> Result<()> {
+        let _inner = self.enter(format!("erase_data {}", phone.id()))?;
+        let data = phone.data_dir();
+        let failed = |error: std::io::Error| {
+            Error::failed(format!("could not erase {}: {error}", data.display()))
+        };
+        if data.exists() {
+            std::fs::remove_dir_all(&data).map_err(failed)?;
+        }
+        std::fs::create_dir(&data).map_err(failed)
+    }
+
+    fn details(&self, id: &PhoneId, _phone: &PhoneDir) -> Result<PhoneDetails> {
+        let inner = self.enter(format!("details {id}"))?;
+        let running = inner.phones.get(id) == Some(&PhoneStatus::Running);
+        Ok(PhoneDetails {
+            data_bytes: Some(FAKE_DATA_BYTES),
+            uptime: running.then_some(FAKE_UPTIME),
         })
     }
 }
@@ -276,17 +310,18 @@ mod tests {
     }
 
     #[test]
-    fn starting_or_stopping_a_phone_that_was_never_created_is_not_found() {
+    fn starting_creates_what_is_missing_and_stopping_nothing_is_harmless() {
         let f = fixture();
         let engine = as_engine(&f.engine);
+        engine.stop(&f.profile.id).unwrap();
         assert_eq!(
-            engine.start(&f.profile, &f.phone).unwrap_err().kind(),
-            ErrorKind::NotFound
+            engine.status(&f.profile.id).unwrap(),
+            PhoneStatus::NotCreated
         );
-        assert_eq!(
-            engine.stop(&f.profile.id).unwrap_err().kind(),
-            ErrorKind::NotFound
-        );
+
+        let report = engine.start(&f.profile, &f.phone).unwrap();
+        assert!(!report.already_running);
+        assert_eq!(engine.status(&f.profile.id).unwrap(), PhoneStatus::Running);
     }
 
     #[test]
@@ -297,7 +332,7 @@ mod tests {
 
         assert_eq!(
             engine.control_endpoint(id).unwrap_err().kind(),
-            ErrorKind::NotFound
+            ErrorKind::Failed
         );
         engine.create(&f.profile, &f.phone).unwrap();
         let stopped = engine.control_endpoint(id).unwrap_err();
@@ -365,6 +400,29 @@ mod tests {
             engine.status(&f.profile.id).unwrap(),
             PhoneStatus::Failed { .. }
         ));
+    }
+
+    #[test]
+    fn it_answers_the_reset_and_info_questions() {
+        let f = fixture();
+        let engine = as_engine(&f.engine);
+        engine.supports_android("14").unwrap();
+        assert_eq!(
+            engine.supports_android("99").unwrap_err().kind(),
+            ErrorKind::NotFound
+        );
+
+        std::fs::write(f.phone.data_dir().join("file"), "x").unwrap();
+        engine.erase_data(&f.phone).unwrap();
+        assert_eq!(std::fs::read_dir(f.phone.data_dir()).unwrap().count(), 0);
+
+        engine.create(&f.profile, &f.phone).unwrap();
+        let stopped = engine.details(&f.profile.id, &f.phone).unwrap();
+        assert_eq!(stopped.data_bytes, Some(FAKE_DATA_BYTES));
+        assert_eq!(stopped.uptime, None);
+        engine.start(&f.profile, &f.phone).unwrap();
+        let running = engine.details(&f.profile.id, &f.phone).unwrap();
+        assert_eq!(running.uptime, Some(FAKE_UPTIME));
     }
 
     #[test]

@@ -54,6 +54,27 @@ pub trait Engine {
 
     /// What this engine supports on this machine.
     fn capabilities(&self) -> Result<Capabilities>;
+
+    /// Checks that the engine has an image for an Android version, without
+    /// downloading anything. Fails with a not-found error otherwise.
+    fn supports_android(&self, android: &str) -> Result<()>;
+
+    /// Deletes a phone's Android data and leaves an empty data folder. The phone
+    /// must be stopped. Android's data is owned by root, so only the engine can
+    /// remove it.
+    fn erase_data(&self, phone: &PhoneDir) -> Result<()>;
+
+    /// Facts about a phone that are slower to gather than its status.
+    fn details(&self, id: &PhoneId, phone: &PhoneDir) -> Result<PhoneDetails>;
+}
+
+/// Facts about a phone beyond its status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PhoneDetails {
+    /// Size of the phone's Android data, when it could be measured.
+    pub data_bytes: Option<u64>,
+    /// How long the phone has been on, when it is on.
+    pub uptime: Option<Duration>,
 }
 
 /// The result of one host check.

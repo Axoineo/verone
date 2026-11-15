@@ -4,10 +4,10 @@ use std::fs::DirBuilder;
 use std::os::unix::fs::DirBuilderExt;
 use std::path::PathBuf;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use verone_core::engine::{
-    BootReport, Capabilities, ControlEndpoint, Engine, HostCheck, PhoneStatus,
+    BootReport, Capabilities, ControlEndpoint, Engine, HostCheck, PhoneDetails, PhoneStatus,
 };
 use verone_core::process::Runner;
 use verone_core::profile::{EngineKind, GraphicsMode, GraphicsUsed, LastBoot, Profile, State};
@@ -38,6 +38,7 @@ const BOOT_POLL_INTERVAL: Duration = Duration::from_secs(1);
 const STOP_POLL_INTERVAL: Duration = Duration::from_millis(250);
 const EXEC_TIMEOUT: Duration = Duration::from_secs(10);
 const ERASE_TIMEOUT: Duration = Duration::from_secs(120);
+const DETAILS_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Restart policy while a phone is meant to be on: a restart requested inside
 /// Android brings it back.
@@ -332,6 +333,13 @@ impl ContainerEngine {
     /// The data is owned by root, so it is removed by a small helper container.
     /// The phone must be stopped.
     pub fn erase_data(&self, phone: &PhoneDir) -> Result<()> {
+        // A phone that was never started has an empty folder the user owns.
+        let already_empty = std::fs::read_dir(phone.data_dir())
+            .map(|mut entries| entries.next().is_none())
+            .unwrap_or(false);
+        if already_empty {
+            return Ok(());
+        }
         if !self.docker.image_present(HELPER_IMAGE)? {
             self.docker.pull(HELPER_IMAGE)?;
         }
@@ -567,6 +575,107 @@ impl Engine for ContainerEngine {
             own_kernel: false,
         })
     }
+
+    fn supports_android(&self, android: &str) -> Result<()> {
+        images::image_for(android).map(|_| ())
+    }
+
+    fn erase_data(&self, phone: &PhoneDir) -> Result<()> {
+        ContainerEngine::erase_data(self, phone)
+    }
+
+    fn details(&self, id: &PhoneId, phone: &PhoneDir) -> Result<PhoneDetails> {
+        let name = Self::container_name(id);
+        let container = self.docker.inspect(&name)?;
+        let running = container
+            .as_ref()
+            .is_some_and(|container| container.status == "running");
+
+        let uptime = container
+            .as_ref()
+            .filter(|_| running)
+            .and_then(|container| unix_seconds(&container.started_at))
+            .and_then(|started| now_unix().checked_sub(started))
+            .map(Duration::from_secs);
+
+        // Android's data is owned by root, so it is measured from inside a
+        // container: the phone itself when it is on, the helper image otherwise.
+        let measured = if running {
+            self.docker
+                .exec(&name, &["du", "-sk", "/data"], DETAILS_TIMEOUT)
+                .ok()
+        } else if self.docker.image_present(HELPER_IMAGE).unwrap_or(false) {
+            self.docker
+                .run_once(
+                    &[
+                        "--network".to_string(),
+                        "none".to_string(),
+                        "--volume".to_string(),
+                        format!("{}:/phone:ro", phone.path().display()),
+                    ],
+                    HELPER_IMAGE,
+                    &[
+                        "du".to_string(),
+                        "-sk".to_string(),
+                        "/phone/data".to_string(),
+                    ],
+                    DETAILS_TIMEOUT,
+                )
+                .ok()
+        } else {
+            None
+        };
+        let data_bytes = measured
+            .and_then(|output| {
+                output
+                    .stdout
+                    .split_whitespace()
+                    .next()
+                    .and_then(|kib| kib.parse::<u64>().ok())
+            })
+            .map(|kib| kib * 1024);
+
+        Ok(PhoneDetails { data_bytes, uptime })
+    }
+}
+
+fn now_unix() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .unwrap_or(0)
+}
+
+/// Converts a UTC timestamp such as `2026-11-15T10:00:00.123456789Z`, as the runtime
+/// prints it, to seconds since 1970. Returns `None` for anything else.
+fn unix_seconds(timestamp: &str) -> Option<u64> {
+    let (date, time) = timestamp.split_once('T')?;
+    let time = time.strip_suffix('Z')?;
+    let mut date_parts = date.split('-').map(|part| part.parse::<u64>().ok());
+    let year = date_parts.next()??;
+    let month = date_parts.next()??;
+    let day = date_parts.next()??;
+    let mut time_parts = time.split(':');
+    let hour: u64 = time_parts.next()?.parse().ok()?;
+    let minute: u64 = time_parts.next()?.parse().ok()?;
+    let second: u64 = time_parts.next()?.split('.').next()?.parse().ok()?;
+    if year < 1970 || !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    if hour > 23 || minute > 59 || second > 60 {
+        return None;
+    }
+
+    // Days from 1970-01-01 to the given date (proleptic Gregorian calendar).
+    let shifted_year = if month <= 2 { year - 1 } else { year };
+    let era = shifted_year / 400;
+    let year_of_era = shifted_year - era * 400;
+    let shifted_month = (month + 9) % 12;
+    let day_of_year = (153 * shifted_month + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = (era * 146_097 + day_of_era).checked_sub(719_468)?;
+
+    Some(days * 86_400 + hour * 3_600 + minute * 60 + second)
 }
 
 #[cfg(test)]
@@ -1100,6 +1209,78 @@ exec*) [ -f "$(dirname "$0")/software" ] && echo 1 ;;
         assert!(with_gpu.root_access);
         assert!(!with_gpu.own_kernel);
         assert_eq!(f.engine(&[]).kind(), EngineKind::Container);
+    }
+
+    #[test]
+    fn timestamps_from_the_runtime_become_unix_seconds() {
+        assert_eq!(unix_seconds("1970-01-01T00:00:00Z"), Some(0));
+        assert_eq!(unix_seconds("2000-03-01T00:00:00Z"), Some(951_868_800));
+        assert_eq!(
+            unix_seconds("2026-11-15T10:00:00.123456789Z"),
+            Some(1_794_736_800)
+        );
+        assert_eq!(unix_seconds("2024-02-29T23:59:59Z"), Some(1_709_251_199));
+        for bad in [
+            "",
+            "0001-01-01T00:00:00Z",
+            "2026-11-15 10:00:00",
+            "2026-13-01T00:00:00Z",
+            "nonsense",
+        ] {
+            assert_eq!(unix_seconds(bad), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn details_report_uptime_and_data_size_of_a_running_phone() {
+        let f = Fixture::new(
+            r#"exec*du*) echo '204800	/data' ;;
+inspect*) echo '[{"State":{"Status":"running","StartedAt":"2026-01-01T00:00:00Z"}}]' ;;"#,
+        );
+        let details = f.engine(&[]).details(f.id(), &f.phone).unwrap();
+        assert_eq!(details.data_bytes, Some(204_800 * 1024));
+        assert!(details.uptime.unwrap() > Duration::from_secs(3600));
+    }
+
+    #[test]
+    fn details_of_a_stopped_phone_have_no_uptime() {
+        let f = Fixture::new(&format!(
+            "image*) echo sha256:abc ;;\nrun*du*) echo '1024 /phone/data' ;;\n{}",
+            inspect_arm("exited", "")
+        ));
+        let details = f.engine(&[]).details(f.id(), &f.phone).unwrap();
+        assert_eq!(details.uptime, None);
+        assert_eq!(details.data_bytes, Some(1024 * 1024));
+    }
+
+    #[test]
+    fn erasing_uses_the_helper_only_when_there_is_data() {
+        let f = Fixture::new("image*) echo sha256:abc ;;");
+        let engine = f.engine(&[]);
+        engine.erase_data(&f.phone).unwrap();
+        assert!(f.stub.calls().is_empty());
+
+        // The stub does not delete anything, so the folder already exists afterwards
+        // and recreating it fails; what matters is that the helper was asked.
+        std::fs::write(f.phone.data_dir().join("file"), "x").unwrap();
+        let _ = engine.erase_data(&f.phone);
+        let calls = f.stub.calls();
+        assert!(
+            calls
+                .iter()
+                .any(|call| call.starts_with("run --rm --network none --volume")
+                    && call.ends_with("rm -rf /phone/data")),
+            "{calls:?}"
+        );
+    }
+
+    #[test]
+    fn android_versions_are_checked_without_downloading() {
+        let f = Fixture::new("");
+        let engine = f.engine(&[]);
+        engine.supports_android("14").unwrap();
+        assert_eq!(engine.supports_android("9").unwrap_err().exit_code(), 4);
+        assert!(f.stub.calls().is_empty());
     }
 
     #[test]
