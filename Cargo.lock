@@ -560,6 +560,9 @@ dependencies = [
 name = "verone-engine-container"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
  "verone-core",
 ]
 

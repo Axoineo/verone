@@ -23,3 +23,4 @@ All notable changes to Verone are recorded here. The format follows
 - Phone profile (`phone.toml`) and state (`state.toml`) files: reading, writing and
   validation, with files from a newer Verone refused and an upgrade hint given.
 - Engine interface that every engine implements, and an in-memory fake engine for tests.
+- Container runtime wrapper: typed calls to Docker for images and containers.
