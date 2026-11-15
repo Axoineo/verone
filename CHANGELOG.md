@@ -22,3 +22,4 @@ All notable changes to Verone are recorded here. The format follows
 - Per-phone lock so two commands cannot work on the same phone at once.
 - Phone profile (`phone.toml`) and state (`state.toml`) files: reading, writing and
   validation, with files from a newer Verone refused and an upgrade hint given.
+- Engine interface that every engine implements, and an in-memory fake engine for tests.

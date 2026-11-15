@@ -4,6 +4,7 @@
 //! It owns the rules: what a phone is, where its data lives, how the host is
 //! checked, and the interface that engines implement.
 
+pub mod engine;
 pub mod error;
 pub mod process;
 pub mod profile;
