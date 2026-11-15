@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **draft for owner review** (2026-11-14). Anything marked *unverified* is tracked
+Status: **current for version 0.1** (updated 2026-11-15 at the end of Phase 1). Anything marked *unverified* is tracked
 in `assumptions.md` and must be tested before code depends on it.
 
 ## Overview
@@ -59,8 +59,8 @@ Consequences:
 
 ## Engine interface
 
-Every engine must provide these operations. Names are indicative; the exact Rust trait
-is written in Phase 1.
+Every engine provides these operations. The trait is `Engine` in
+`crates/verone-core/src/engine.rs`.
 
 | Operation | Meaning |
 |---|---|
@@ -71,6 +71,9 @@ is written in Phase 1.
 | `status` | Stopped, booting, running, or failed with a reason. |
 | `control_endpoint` | Where the debug connection (adb) for this phone can be reached. |
 | `capabilities` | What this engine supports on this host: GPU, camera, audio, root, security fidelity. |
+| `supports_android` | Whether the engine has an image for an Android version, without downloading. |
+| `erase_data` | Delete a phone's Android data. Only the engine can, because the data is owned by root. |
+| `details` | Slower facts about a phone: data size and how long it has been on. |
 
 ### Container engine (first)
 
@@ -183,15 +186,16 @@ redroid's adb must be treated as an unauthenticated administrator door into the 
 | Android system image | Downloaded on first use, per Android version. |
 | Google apps | Downloaded only if the user opts in. |
 
-## Repository layout (proposed, depends on D-011)
+## Repository layout
 
 ```
 verone/
   crates/
-    verone-core/     phones, images, lock, backups, host checks, engine interface
-    verone-engine-container/
-    verone-cli/
-  app/               Tauri desktop app
+    verone-core/              phones, storage, profiles, engine interface, errors
+    verone-engine-container/  runtime wrapper, host checks, images, lifecycle, adb
+    verone-cli/               the `verone` command
+  tests/e2e/                  end-to-end tests on real phones
+  tests/phase-0/              scripts from the Phase 0 proof tests
+  packaging/arch/             Arch package recipe
   docs/
-  tests/
 ```

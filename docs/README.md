@@ -9,11 +9,12 @@ work from it.
 |---|---|---|
 | [vision-and-scope.md](vision-and-scope.md) | What Verone is, who it is for, what it will never do. | Approved baseline |
 | [decisions.md](decisions.md) | What has been decided, by whom, and why. | Live log; all current entries accepted |
-| [architecture.md](architecture.md) | How Verone is put together. | Draft for owner review |
-| [roadmap.md](roadmap.md) | The phases, their outcomes and exit tests. | Draft for owner review |
+| [architecture.md](architecture.md) | How Verone is put together. | Current for version 0.1 |
+| [roadmap.md](roadmap.md) | The phases, their outcomes and exit tests. | In use |
 | [assumptions.md](assumptions.md) | What the design depends on, what has been tested, known risks. | Live register |
 | [phases/phase-0.md](phases/phase-0.md) | Step-by-step proof tests for Phase 0. | Ready for owner review |
-| [phases/phase-1.md](phases/phase-1.md) | Executable task plan for Phase 1: 18 tasks with acceptance tests. | Approved 2026-11-15 |
+| [phases/phase-1.md](phases/phase-1.md) | Executable task plan for Phase 1: 18 tasks with acceptance tests. | Built 2026-11-15 |
+| [user-guide/cli.md](user-guide/cli.md) | Every command, option, exit code and known limit of version 0.1. | Current |
 | [future-ideas.md](future-ideas.md) | Ideas not yet scheduled. Not to be built until approved. | Live backlog |
 
 ## Still to be written
@@ -21,9 +22,8 @@ work from it.
 | Document | Written when |
 |---|---|
 | `phases/phase-N.md` — task lists for Phase 2 onwards | Before each phase starts |
-| `user-guide/` | During Phases 2 and 3 |
+| More of `user-guide/` (the desktop app) | During Phases 2 and 3 |
 | `developer-guide/` | During Phase 4 |
-| `CONTRIBUTING.md`, `SECURITY.md` (repository root) | During Phase 1 |
 
 ## Rules for agents
 

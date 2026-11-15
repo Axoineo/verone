@@ -6,6 +6,10 @@ All notable changes to Verone are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-15
+
+First release: a command-line tool that runs Android 14 phones on Linux with Docker.
+
 ### Added
 
 - Rust workspace with three crates: `verone-core`, `verone-engine-container` and
@@ -36,3 +40,7 @@ All notable changes to Verone are recorded here. The format follows
   `install`, `reset` and `delete`. `reset` and `delete` ask for confirmation unless
   `--yes` is given.
 - End-to-end test script `tests/e2e/phase-1.sh` that runs every command on a real phone.
+- `verone completions <shell>` for bash, zsh, fish, elvish and powershell.
+- Arch package recipe in `packaging/arch`, and a release build optimised for size.
+- User documentation: quick start in the README, a command reference, `SECURITY.md` and
+  `CONTRIBUTING.md`.
