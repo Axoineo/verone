@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: **draft for owner review** (2026-11-14).
+Status: **in use** (updated 2026-11-15). Phase 0 is mostly complete, Phase 1 is built.
 
 ## How to work from this roadmap
 
@@ -18,7 +18,7 @@ Status: **draft for owner review** (2026-11-14).
 | Phase | Name | Outcome |
 |---|---|---|
 | 0 | Proof | Every blocking assumption tested; go or change the design. |
-| 1 | Core and command line | `verone` creates, starts, stops, resets and lists phones. |
+| 1 | Core and command line | `verone` creates, starts, stops, resets and lists phones. **Built; released as 0.1.0 when the owner tags it.** |
 | 2 | Desktop app | A phone in a window, usable without a terminal. |
 | 3 | Phone fidelity and lock | First-boot setup, optional Google apps, encrypted storage, backups, camera. |
 | 4 | Developer and tester toolkit | Many phones, snapshots, profiles, automation, CI. |
@@ -54,6 +54,10 @@ Exit test: every assumption marked "blocking" for Phase 1 has passed, or the own
 approved a design change. Proposed decisions D-011 to D-014 are accepted or replaced.
 
 ## Phase 1 — Core and command line
+
+Status 2026-11-15: all tasks are done and the exit test passes on the reference
+laptop, including with the packaged binary. Remaining owner steps: install the package
+once to confirm it, and create the `v0.1.0` tag.
 
 Purpose: the engine layer and a complete command-line tool. Everything later sits on this.
 Detailed tasks: [phases/phase-1.md](phases/phase-1.md).

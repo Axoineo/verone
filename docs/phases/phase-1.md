@@ -1,7 +1,7 @@
 # Phase 1 — Core and command line
 
-Status: **approved by the owner** (2026-11-15). Work can start once the owner preparation
-below is done.
+Status: **built** (2026-11-15). All tasks are done and the exit test passes. The owner
+still installs the package once and creates the `v0.1.0` tag.
 
 Outcome: a `verone` command-line tool that creates, starts, stops, resets, lists and
 opens Android phones on Linux, built on a core library that every later front end

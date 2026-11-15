@@ -97,3 +97,27 @@ fn a_relative_verone_home_is_a_usage_error() {
         .code(2)
         .stderr(predicate::str::contains("VERONE_HOME"));
 }
+
+#[test]
+fn completion_scripts_are_generated_for_each_shell() {
+    for (shell, marker) in [
+        ("bash", "complete -F"),
+        ("zsh", "#compdef verone"),
+        ("fish", "complete -c verone"),
+    ] {
+        // No data home is needed, so even a broken one must not matter.
+        Command::cargo_bin("verone")
+            .unwrap()
+            .args(["completions", shell])
+            .env("VERONE_HOME", "relative/path")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains(marker))
+            .stdout(predicate::str::contains("restart"));
+    }
+    Command::cargo_bin("verone")
+        .unwrap()
+        .args(["completions", "nonsense"])
+        .assert()
+        .code(2);
+}
