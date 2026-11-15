@@ -20,3 +20,5 @@ All notable changes to Verone are recorded here. The format follows
 - Storage layout: the data home (`VERONE_HOME`, then `XDG_DATA_HOME/verone`, then
   `~/.local/share/verone`), one private folder per phone, and phone id rules.
 - Per-phone lock so two commands cannot work on the same phone at once.
+- Phone profile (`phone.toml`) and state (`state.toml`) files: reading, writing and
+  validation, with files from a newer Verone refused and an upgrade hint given.
