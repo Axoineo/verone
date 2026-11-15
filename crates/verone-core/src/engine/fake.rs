@@ -91,12 +91,6 @@ impl FakeEngine {
     }
 }
 
-fn not_created(id: &PhoneId) -> Error {
-    Error::not_found(format!(
-        "the phone '{id}' has not been created in the engine"
-    ))
-}
-
 impl Engine for FakeEngine {
     fn kind(&self) -> EngineKind {
         EngineKind::Container
@@ -134,9 +128,11 @@ impl Engine for FakeEngine {
 
     fn start(&self, profile: &Profile, _phone: &PhoneDir) -> Result<BootReport> {
         let mut inner = self.enter(format!("start {}", profile.id))?;
-        let Some(status) = inner.phones.get_mut(&profile.id) else {
-            return Err(not_created(&profile.id));
-        };
+        // Like the real engines, starting creates what is missing.
+        let status = inner
+            .phones
+            .entry(profile.id.clone())
+            .or_insert(PhoneStatus::Stopped);
         let already_running = *status == PhoneStatus::Running;
         *status = PhoneStatus::Running;
         Ok(BootReport {
@@ -153,13 +149,11 @@ impl Engine for FakeEngine {
 
     fn stop(&self, id: &PhoneId) -> Result<()> {
         let mut inner = self.enter(format!("stop {id}"))?;
-        match inner.phones.get_mut(id) {
-            Some(status) => {
-                *status = PhoneStatus::Stopped;
-                Ok(())
-            }
-            None => Err(not_created(id)),
+        // Stopping a phone that has nothing running is not an error.
+        if let Some(status) = inner.phones.get_mut(id) {
+            *status = PhoneStatus::Stopped;
         }
+        Ok(())
     }
 
     fn status(&self, id: &PhoneId) -> Result<PhoneStatus> {
@@ -178,9 +172,9 @@ impl Engine for FakeEngine {
                 host: "127.0.0.1".to_string(),
                 port: 5555,
             }),
-            Some(_) => Err(Error::failed(format!("the phone '{id}' is not running"))
+            // Stopped or never started: either way there is nothing to connect to.
+            _ => Err(Error::failed(format!("the phone '{id}' is not running"))
                 .with_hint(format!("Start it with: verone start {id}"))),
-            None => Err(not_created(id)),
         }
     }
 
@@ -316,17 +310,18 @@ mod tests {
     }
 
     #[test]
-    fn starting_or_stopping_a_phone_that_was_never_created_is_not_found() {
+    fn starting_creates_what_is_missing_and_stopping_nothing_is_harmless() {
         let f = fixture();
         let engine = as_engine(&f.engine);
+        engine.stop(&f.profile.id).unwrap();
         assert_eq!(
-            engine.start(&f.profile, &f.phone).unwrap_err().kind(),
-            ErrorKind::NotFound
+            engine.status(&f.profile.id).unwrap(),
+            PhoneStatus::NotCreated
         );
-        assert_eq!(
-            engine.stop(&f.profile.id).unwrap_err().kind(),
-            ErrorKind::NotFound
-        );
+
+        let report = engine.start(&f.profile, &f.phone).unwrap();
+        assert!(!report.already_running);
+        assert_eq!(engine.status(&f.profile.id).unwrap(), PhoneStatus::Running);
     }
 
     #[test]
@@ -337,7 +332,7 @@ mod tests {
 
         assert_eq!(
             engine.control_endpoint(id).unwrap_err().kind(),
-            ErrorKind::NotFound
+            ErrorKind::Failed
         );
         engine.create(&f.profile, &f.phone).unwrap();
         let stopped = engine.control_endpoint(id).unwrap_err();
