@@ -12,3 +12,8 @@ All notable changes to Verone are recorded here. The format follows
   `verone-cli` (the `verone` binary).
 - `verone --version`.
 - Continuous integration running the format, lint and test checks on every pull request.
+- Error type with a message, a "what to do" hint and one exit code per kind of failure
+  (1 failed, 2 usage, 3 host check, 4 not found, 5 busy).
+- Process runner for external programs: argument lists only, time limits, captured or
+  pass-through output.
+- Global options `--json` and `-v`/`--verbose`.

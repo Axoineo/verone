@@ -231,7 +231,8 @@ Global options: `--json` (machine-readable output for `doctor`, `list`, `info`,
 - Do: in `verone-core`, an error type covering the exit codes above, each error
   carrying a message and a "what to do" hint; a process module that runs a program
   with an argument list, a timeout, captured output and optional pass-through of the
-  terminal; printing helpers for normal and `--json` output; `-v` logging of commands.
+  terminal, and logs each command when `-v` is set. In `verone-cli`, printing helpers
+  for normal and `--json` output (printing belongs to the front end, not the core).
 - Done when: unit tests cover timeout, non-zero exit, program-not-found and output
   capture; `verone nonsense` exits with code 2.
 
