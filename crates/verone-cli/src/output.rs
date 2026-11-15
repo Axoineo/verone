@@ -23,10 +23,6 @@ impl Mode {
 
 /// Writes a result to `out`: as JSON in JSON mode, otherwise as the text `human`
 /// produces. A final newline is added if the text lacks one.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "first used by the `doctor` command in P1-15")
-)]
 pub fn emit<T, W, F>(mode: Mode, out: &mut W, value: &T, human: F) -> Result<()>
 where
     T: Serialize,

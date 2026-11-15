@@ -42,10 +42,58 @@ fn no_arguments_shows_help_and_is_a_usage_error() {
 }
 
 #[test]
-fn global_options_are_accepted() {
+fn doctor_fails_with_exit_code_3_and_names_the_runtime_when_it_is_missing() {
+    let home = tempfile::tempdir().unwrap();
     Command::cargo_bin("verone")
         .unwrap()
-        .args(["--json", "--verbose"])
+        .arg("doctor")
+        .env("PATH", "/nonexistent")
+        .env("VERONE_HOME", home.path())
         .assert()
-        .success();
+        .code(3)
+        .stdout(predicate::str::contains("FAILED   Container runtime"))
+        .stdout(predicate::str::contains("Install Docker"))
+        .stderr(predicate::str::contains("phones cannot run yet"));
+}
+
+#[test]
+fn doctor_json_is_parseable_even_when_checks_fail() {
+    let home = tempfile::tempdir().unwrap();
+    let output = Command::cargo_bin("verone")
+        .unwrap()
+        .args(["doctor", "--json"])
+        .env("PATH", "/nonexistent")
+        .env("VERONE_HOME", home.path())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(3));
+    let parsed: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let checks = parsed.as_array().unwrap();
+    assert_eq!(checks.len(), 9);
+    assert_eq!(checks[0]["name"], "Container runtime");
+    assert_eq!(checks[0]["outcome"], "failed");
+}
+
+#[test]
+fn an_unsupported_android_version_is_not_found() {
+    let home = tempfile::tempdir().unwrap();
+    Command::cargo_bin("verone")
+        .unwrap()
+        .args(["image", "pull", "--android", "9"])
+        .env("VERONE_HOME", home.path())
+        .assert()
+        .code(4)
+        .stderr(predicate::str::contains("no image for Android 9"))
+        .stderr(predicate::str::contains("Supported versions: 14"));
+}
+
+#[test]
+fn a_relative_verone_home_is_a_usage_error() {
+    Command::cargo_bin("verone")
+        .unwrap()
+        .arg("doctor")
+        .env("VERONE_HOME", "relative/path")
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("VERONE_HOME"));
 }

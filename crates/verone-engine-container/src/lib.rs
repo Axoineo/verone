@@ -1,4 +1,11 @@
 //! Container engine for Verone.
 //!
 //! Runs Android (redroid) in a container that shares the host's Linux kernel.
-//! The engine implementation is added by later Phase 1 tasks.
+
+pub mod adb;
+pub mod engine;
+pub mod host;
+pub mod images;
+pub mod runtime;
+
+pub use engine::ContainerEngine;

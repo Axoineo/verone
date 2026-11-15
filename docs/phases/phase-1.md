@@ -33,11 +33,12 @@ Podman (unless test T-07 passes and the owner adds task P1-19), any background s
 
 ## Rules for agents
 
-1. One task per branch and pull request. Branch name: `p1/<task number>-<short-name>`,
-   created from an up-to-date `main`.
+1. One branch and one pull request per milestone, with one commit per task. Branch
+   name: `p1/milestone-<letter>-<short-name>`, created from an up-to-date `main`.
+   (Changed by the owner on 2026-11-15; Milestone A used one pull request per task.)
 2. Do the tasks in number order unless a task's "Depends on" says otherwise.
 3. A task is done only when every command under "Done when" succeeds on the reference
-   laptop. Paste the commands and their output into the pull request.
+   laptop. Paste the commands and their output into the milestone's pull request.
 4. Dependencies: only the crates in the allow-list below. Anything else needs the
    owner's approval first.
 5. No `unsafe`. No `unwrap()` or `expect()` outside tests. No command built as a shell

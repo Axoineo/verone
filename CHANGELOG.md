@@ -22,3 +22,13 @@ All notable changes to Verone are recorded here. The format follows
 - Per-phone lock so two commands cannot work on the same phone at once.
 - Phone profile (`phone.toml`) and state (`state.toml`) files: reading, writing and
   validation, with files from a newer Verone refused and an upgrade hint given.
+- Engine interface that every engine implements, and an in-memory fake engine for tests.
+- Container runtime wrapper: typed calls to Docker for images and containers.
+- Host checks: runtime, kernel binder, kernel modules, disk space, memory, graphics and
+  helper programs, each with a fix when it does not pass.
+- Container engine: Android 14 image pinned by digest, container creation from the phone
+  profile, boot with a wait for Android to be ready, clean shutdown from inside Android,
+  automatic return after an in-Android restart, and a one-time fallback from GPU to
+  software rendering.
+- adb helper that drops stale connections and reconnects before every use.
+- `verone doctor`, `verone image pull` and `verone image list`.
