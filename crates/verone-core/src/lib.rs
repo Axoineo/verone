@@ -6,6 +6,7 @@
 
 pub mod error;
 pub mod process;
+pub mod storage;
 
 pub use error::{Error, ErrorKind, Result};
 

@@ -17,3 +17,6 @@ All notable changes to Verone are recorded here. The format follows
 - Process runner for external programs: argument lists only, time limits, captured or
   pass-through output.
 - Global options `--json` and `-v`/`--verbose`.
+- Storage layout: the data home (`VERONE_HOME`, then `XDG_DATA_HOME/verone`, then
+  `~/.local/share/verone`), one private folder per phone, and phone id rules.
+- Per-phone lock so two commands cannot work on the same phone at once.
