@@ -4,6 +4,11 @@
 //! It owns the rules: what a phone is, where its data lives, how the host is
 //! checked, and the interface that engines implement.
 
+pub mod error;
+pub mod process;
+
+pub use error::{Error, ErrorKind, Result};
+
 /// Version of the Verone core library.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
