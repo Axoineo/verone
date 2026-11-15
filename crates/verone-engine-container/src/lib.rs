@@ -2,4 +2,5 @@
 //!
 //! Runs Android (redroid) in a container that shares the host's Linux kernel.
 
+pub mod host;
 pub mod runtime;

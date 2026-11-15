@@ -24,3 +24,5 @@ All notable changes to Verone are recorded here. The format follows
   validation, with files from a newer Verone refused and an upgrade hint given.
 - Engine interface that every engine implements, and an in-memory fake engine for tests.
 - Container runtime wrapper: typed calls to Docker for images and containers.
+- Host checks: runtime, kernel binder, kernel modules, disk space, memory, graphics and
+  helper programs, each with a fix when it does not pass.
