@@ -42,7 +42,10 @@ const DATA_DIR: &str = "data";
 ///
 /// Lowercase letters, digits and hyphens; 1 to 31 characters; starts with a letter
 /// or digit.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[serde(try_from = "String", into = "String")]
 pub struct PhoneId(String);
 
 impl PhoneId {
@@ -83,6 +86,20 @@ impl PhoneId {
 impl fmt::Display for PhoneId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+impl TryFrom<String> for PhoneId {
+    type Error = Error;
+
+    fn try_from(id: String) -> Result<Self> {
+        Self::new(&id)
+    }
+}
+
+impl From<PhoneId> for String {
+    fn from(id: PhoneId) -> Self {
+        id.0
     }
 }
 
