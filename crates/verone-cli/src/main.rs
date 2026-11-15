@@ -102,6 +102,11 @@ enum Command {
         #[arg(long)]
         yes: bool,
     },
+    /// Print a shell completion script. Example: verone completions bash
+    Completions {
+        /// The shell to generate the script for.
+        shell: clap_complete::Shell,
+    },
 }
 
 /// The graphics modes offered on the command line.
@@ -190,6 +195,17 @@ fn run(cli: &Cli) -> Result<()> {
     let Some(command) = &cli.command else {
         return Ok(());
     };
+    // Completions need no data home, runtime or engine.
+    if let Command::Completions { shell } = command {
+        use clap::CommandFactory;
+        use std::io::Write;
+        // Generate into memory first: writing straight to a closed pipe (for
+        // example `verone completions bash | head`) would otherwise panic.
+        let mut script = Vec::new();
+        clap_complete::generate(*shell, &mut Cli::command(), "verone", &mut script);
+        let _ = std::io::stdout().write_all(&script);
+        return Ok(());
+    }
     let context = Context::from_cli(cli)?;
     let mut out = std::io::stdout().lock();
     match command {
@@ -250,6 +266,7 @@ fn run(cli: &Cli) -> Result<()> {
             &mut std::io::stdin().lock(),
             &mut out,
         ),
+        Command::Completions { .. } => Ok(()),
     }
 }
 

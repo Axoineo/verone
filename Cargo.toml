@@ -15,3 +15,10 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
+
+# Small binaries matter more than build time for a tool people download.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
