@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/verone-logo-on-dark.svg">
+    <img src="docs/brand/verone-logo.svg" alt="Verone" width="360">
+  </picture>
+</p>
+
 # Verone
 
 Verone is an open-source virtual Android phone that runs as an application on a PC,
