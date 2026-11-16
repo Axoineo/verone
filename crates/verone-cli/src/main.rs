@@ -1,6 +1,7 @@
 //! The `verone` command-line tool.
 
 mod commands;
+mod logo;
 mod output;
 mod phone;
 
@@ -16,8 +17,17 @@ use verone_engine_container::ContainerEngine;
 
 /// A virtual Android phone that runs on your computer.
 #[derive(Debug, Parser)]
-#[command(name = "verone", version, about, arg_required_else_help = true)]
+#[command(
+    name = "verone",
+    about,
+    arg_required_else_help = true,
+    disable_version_flag = true
+)]
 struct Cli {
+    /// Print the Verone version, with the logo when shown in a terminal.
+    #[arg(short = 'V', long)]
+    version: bool,
+
     /// Print results as JSON, for use by other programs.
     #[arg(long, global = true)]
     json: bool,
@@ -192,6 +202,10 @@ fn main() -> ExitCode {
 
 /// Runs the requested command.
 fn run(cli: &Cli) -> Result<()> {
+    if cli.version {
+        logo::print_version();
+        return Ok(());
+    }
     let Some(command) = &cli.command else {
         return Ok(());
     };

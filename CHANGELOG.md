@@ -6,6 +6,12 @@ All notable changes to Verone are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The Verone logo, in `docs/brand`.
+- `verone --version` shows the logo beside the version when run in a terminal, in
+  colour unless `NO_COLOR` is set. Piped or redirected output is unchanged.
+
 ## [0.1.0] - 2026-11-15
 
 First release: a command-line tool that runs Android 14 phones on Linux with Docker.
