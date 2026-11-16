@@ -18,7 +18,9 @@ your PC, laptop or server.
 | `png/` | PNG exports of the above |
 | `terminal/` | The mark for terminal output: large, small and plain ASCII |
 
-Run `terminal/preview.sh` to see the terminal versions in colour.
+Run `terminal/preview.sh` to see the terminal versions in colour. `verone --version`
+prints `terminal/logo-large.txt`; a test fails if the copy in
+`crates/verone-cli/src/logo.rs` drifts from it.
 
 ## Colours
 

@@ -17,7 +17,7 @@ digit. Examples: `work`, `test-2`.
 | `--json` | Print the result as JSON, for scripts. |
 | `-v`, `--verbose` | Show each external command (Docker, adb, scrcpy) before it runs. |
 | `--help` | Explain the command. |
-| `--version` | Print the Verone version. |
+| `-V`, `--version` | Print the Verone version. In a terminal it is shown beside the Verone logo, in colour unless `NO_COLOR` is set; piped or redirected, it is the single line `verone 0.1.0`. |
 
 ## Commands
 
