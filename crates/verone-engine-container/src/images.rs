@@ -16,6 +16,9 @@ pub struct Image {
     pub tag: &'static str,
     /// The content digest the image is pulled and run by.
     pub digest: &'static str,
+    /// True if Android in this image ignores restart and power-off requests made
+    /// inside it, so the power watcher must carry them out (decision D-017).
+    pub power_watcher: bool,
 }
 
 impl Image {
@@ -41,12 +44,14 @@ pub const IMAGES: &[Image] = &[
         repository: "redroid/redroid",
         tag: "14.0.0-latest",
         digest: "sha256:a3e654caad74faed03cd5ead057a989e06f507778cda678e5d3b9772e0092f1c",
+        power_watcher: false,
     },
     Image {
         android: "12",
         repository: "redroid/redroid",
         tag: "12.0.0-latest",
         digest: "sha256:52332b2d74f337982d5ac281a8020ec297fb1ea05cbdcdaaa9c19a2065ae1adc",
+        power_watcher: true,
     },
 ];
 
@@ -65,6 +70,15 @@ pub fn image_for(android: &str) -> Result<&'static Image> {
                 supported_versions().join(", ")
             ))
         })
+}
+
+/// The Android versions whose phones need the power watcher.
+pub fn power_watcher_versions() -> Vec<&'static str> {
+    IMAGES
+        .iter()
+        .filter(|image| image.power_watcher)
+        .map(|image| image.android)
+        .collect()
 }
 
 /// The Android versions that have an image.
@@ -95,6 +109,11 @@ mod tests {
             "redroid/redroid@sha256:52332b2d74f337982d5ac281a8020ec297fb1ea05cbdcdaaa9c19a2065ae1adc"
         );
         assert_eq!(image.display_name(), "redroid/redroid:12.0.0-latest");
+    }
+
+    #[test]
+    fn only_android_12_needs_the_power_watcher() {
+        assert_eq!(power_watcher_versions(), ["12"]);
     }
 
     #[test]
