@@ -11,6 +11,11 @@ All notable changes to Verone are recorded here. The format follows
 - The Verone logo, in `docs/brand`.
 - `verone --version` shows the logo beside the version when run in a terminal, in
   colour unless `NO_COLOR` is set. Piped or redirected output is unchanged.
+- Android 12 phones: `verone create NAME --android 12`, using
+  `redroid/redroid:12.0.0-latest` pinned by digest. Android 14 stays the default.
+  Known limit: on Android 12, "Restart" and "Power off" inside Android do nothing, and
+  `verone stop` forces the phone off after 20 seconds.
+- The phone fidelity benchmark design, in `docs/benchmark.md` (decision D-016).
 
 ## [0.1.0] - 2026-11-15
 

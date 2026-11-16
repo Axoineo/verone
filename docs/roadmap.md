@@ -29,6 +29,10 @@ Status: **in use** (updated 2026-11-15). Phase 0 is mostly complete, Phase 1 is 
 
 Packaging, user documentation and release work run inside every phase from Phase 1 on.
 
+The [phone fidelity benchmark](benchmark.md) (D-016) is run at the end of
+every phase, so each phase's progress towards "behave like a phone" is measured against
+a real phone and against other virtual Android systems.
+
 ---
 
 ## Phase 0 — Proof

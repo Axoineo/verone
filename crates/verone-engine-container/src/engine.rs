@@ -1196,9 +1196,10 @@ exec*) [ -f "$(dirname "$0")/software" ] && echo 1 ;;
         );
 
         let statuses = absent.engine(&[]).image_statuses().unwrap();
-        assert_eq!(statuses.len(), 1);
+        assert_eq!(statuses.len(), 2);
         assert_eq!(statuses[0].android, "14");
-        assert!(!statuses[0].present);
+        assert_eq!(statuses[1].android, "12");
+        assert!(statuses.iter().all(|status| !status.present));
     }
 
     #[test]

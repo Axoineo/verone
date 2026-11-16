@@ -15,6 +15,8 @@ work from it.
 | [phases/phase-0.md](phases/phase-0.md) | Step-by-step proof tests for Phase 0. | Ready for owner review |
 | [phases/phase-1.md](phases/phase-1.md) | Executable task plan for Phase 1: 18 tasks with acceptance tests. | Built 2026-11-15 |
 | [user-guide/cli.md](user-guide/cli.md) | Every command, option, exit code and known limit of version 0.1. | Current |
+| [benchmark.md](benchmark.md) | How close Verone and other virtual Android systems are to a real phone, and how that is measured. | Accepted (D-016); not built yet |
+| [design/android-12-power.md](design/android-12-power.md) | How restart and power-off inside Android 12 are made to work. | Accepted (D-017) |
 | [future-ideas.md](future-ideas.md) | Ideas not yet scheduled. Not to be built until approved. | Live backlog |
 
 ## Still to be written
