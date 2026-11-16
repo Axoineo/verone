@@ -11,12 +11,13 @@ use verone_core::engine::{
 };
 use verone_core::process::Runner;
 use verone_core::profile::{EngineKind, GraphicsMode, GraphicsUsed, LastBoot, Profile, State};
-use verone_core::storage::{PhoneDir, PhoneId};
+use verone_core::storage::{PhoneDir, PhoneId, Storage};
 use verone_core::{Error, Result};
 
 use crate::adb::Adb;
 use crate::host::HostProbe;
 use crate::images::{self, HELPER_IMAGE, IMAGES};
+use crate::power::{self, LABEL_ROLE, ROLE, WatcherSpec};
 use crate::runtime::{Container, Docker};
 
 /// How long Android may take to boot.
@@ -273,6 +274,16 @@ impl ContainerEngine {
     ) -> Result<()> {
         let name = Self::container_name(&profile.id);
         let spec = self.spec(profile, phone, graphics)?;
+        if images::image_for(&profile.android)?.power_watcher {
+            self.ensure_power_watcher().map_err(|error| {
+                Error::failed(format!(
+                    "could not start the power watcher that Android {} phones need: {}",
+                    profile.android,
+                    error.message()
+                ))
+                .with_hint("Run verone doctor, then try again.")
+            })?;
+        }
         self.ensure_container(profile, &spec)?;
         self.docker.update_restart(&name, RESTART_ON)?;
         self.docker.start(&name).map_err(|error| {
@@ -369,6 +380,96 @@ impl ContainerEngine {
             })
     }
 
+    /// The folder that holds every phone, resolved the way the kernel reports it in
+    /// mount tables, which the power watcher matches against.
+    fn phones_dir(&self) -> PathBuf {
+        let dir = Storage::new(&self.data_home).phones_dir();
+        dir.canonicalize().unwrap_or(dir)
+    }
+
+    /// Makes sure the power watcher for this data folder exists, is current and
+    /// runs (decision D-017).
+    fn ensure_power_watcher(&self) -> Result<()> {
+        let phones_dir = self.phones_dir();
+        let name = power::watcher_name(&phones_dir);
+        let spec = WatcherSpec::new(&phones_dir, &images::power_watcher_versions());
+        let fingerprint = spec.fingerprint();
+        if let Some(existing) = self.docker.inspect(&name)? {
+            if existing.labels.get(LABEL_SPEC) == Some(&fingerprint) {
+                if existing.status != "running" {
+                    self.docker.start(&name)?;
+                }
+                return Ok(());
+            }
+            self.docker.remove(&name)?;
+        }
+        if !self.docker.image_present(HELPER_IMAGE)? {
+            self.docker.pull(HELPER_IMAGE)?;
+        }
+        let mut options = vec![
+            "--label".to_string(),
+            format!("{LABEL_ROLE}={ROLE}"),
+            "--label".to_string(),
+            format!("{LABEL_SPEC}={fingerprint}"),
+        ];
+        options.extend(spec.options);
+        self.docker
+            .create(&name, &options, &spec.image, &spec.command)?;
+        self.docker.start(&name)
+    }
+
+    /// True if any phone's container runs an image that needs the power watcher.
+    fn power_watcher_needed(&self) -> Result<bool> {
+        let needing: Vec<String> = IMAGES
+            .iter()
+            .filter(|image| image.power_watcher)
+            .map(images::Image::reference)
+            .collect();
+        Ok(self
+            .docker
+            .images_with_label(LABEL_PHONE)?
+            .iter()
+            .any(|image| needing.contains(image)))
+    }
+
+    /// Removes the power watcher once no phone needs it.
+    fn remove_unused_power_watcher(&self) -> Result<()> {
+        if self.power_watcher_needed()? {
+            return Ok(());
+        }
+        let name = power::watcher_name(&self.phones_dir());
+        if self.docker.inspect(&name)?.is_some() {
+            self.docker.remove(&name)?;
+        }
+        Ok(())
+    }
+
+    /// The `verone doctor` line for the power watcher, if any phone needs it.
+    fn power_watcher_check(&self) -> Option<HostCheck> {
+        const NAME: &str = "Power watcher for Android 12";
+        if !self.power_watcher_needed().unwrap_or(false) {
+            return None;
+        }
+        let name = power::watcher_name(&self.phones_dir());
+        let running = self
+            .docker
+            .inspect(&name)
+            .ok()
+            .flatten()
+            .is_some_and(|container| container.status == "running");
+        Some(if running {
+            HostCheck::ok(NAME, format!("{name} is running"))
+        } else {
+            HostCheck::warning(
+                NAME,
+                format!(
+                    "{name} is not running, so Restart and Power off inside Android 12 do nothing"
+                ),
+                "Start any Android 12 phone with verone start; it starts the watcher again.",
+            )
+        })
+    }
+
     /// Every supported image and whether it is downloaded.
     pub fn image_statuses(&self) -> Result<Vec<ImageStatus>> {
         IMAGES
@@ -421,9 +522,11 @@ impl Engine for ContainerEngine {
                     .unwrap_or(false)
             })
             .unwrap_or(false);
-        Ok(self
+        let mut checks = self
             .probe
-            .check_all(&self.docker, image_present, &self.data_home))
+            .check_all(&self.docker, image_present, &self.data_home);
+        checks.extend(self.power_watcher_check());
+        Ok(checks)
     }
 
     fn prepare_image(&self, android: &str) -> Result<()> {
@@ -447,7 +550,7 @@ impl Engine for ContainerEngine {
         if self.docker.inspect(&name)?.is_some() {
             self.docker.remove(&name)?;
         }
-        Ok(())
+        self.remove_unused_power_watcher()
     }
 
     fn start(&self, profile: &Profile, phone: &PhoneDir) -> Result<BootReport> {
@@ -1170,7 +1273,161 @@ exec*) [ -f "$(dirname "$0")/software" ] && echo 1 ;;
 
         let f = Fixture::new(NO_CONTAINER);
         f.engine(&[]).destroy(f.id()).unwrap();
-        assert_eq!(f.stub.calls().len(), 1);
+        assert!(f.stub.calls().iter().all(|call| !call.starts_with("rm")));
+    }
+
+    // ---- power watcher (D-017) ----
+
+    const ANDROID_12_IMAGE: &str =
+        "redroid/redroid@sha256:52332b2d74f337982d5ac281a8020ec297fb1ea05cbdcdaaa9c19a2065ae1adc";
+
+    fn watcher_name(f: &Fixture) -> String {
+        let dir = f.temp.path().join("phones");
+        power::watcher_name(&dir.canonicalize().unwrap_or(dir))
+    }
+
+    fn watcher_fingerprint(f: &Fixture) -> String {
+        let dir = f.temp.path().join("phones");
+        WatcherSpec::new(&dir.canonicalize().unwrap_or(dir), &["12"]).fingerprint()
+    }
+
+    /// A stub answer for inspecting the watcher only.
+    fn watcher_arm(f: &Fixture, status: &str) -> String {
+        format!(
+            r#""inspect --type container {}"*) echo '[{{"State":{{"Status":"{status}","ExitCode":0}},"Config":{{"Labels":{{"io.verone.spec":"{}"}}}}}}]' ;;"#,
+            watcher_name(f),
+            watcher_fingerprint(f)
+        )
+    }
+
+    /// A fixture whose stub runtime is chosen after the fixture exists, because the
+    /// answers depend on its temporary folder.
+    fn fixture_with(arms: impl Fn(&Fixture) -> String) -> Fixture {
+        let mut f = Fixture::new("");
+        f.stub = Stub::new(&arms(&f));
+        f
+    }
+
+    #[test]
+    fn starting_an_android_12_phone_starts_the_watcher_first() {
+        let mut f = fixture_with(|_| format!("{NO_CONTAINER}\nexec*) echo 1 ;;"));
+        f.profile.android = "12".to_string();
+        f.engine(&[]).start(&f.profile, &f.phone).unwrap();
+        let name = watcher_name(&f);
+        let calls = f.stub.calls();
+        let create = calls
+            .iter()
+            .position(|call| call.starts_with(&format!("create --name {name} ")))
+            .expect("the watcher is created");
+        assert!(calls[create].contains("--label io.verone.role=power-watcher"));
+        assert!(calls[create].contains("--pid host"));
+        let started = |who: &str| {
+            calls
+                .iter()
+                .position(|call| call == &format!("start {who}"))
+                .unwrap_or_else(|| panic!("{who} is started: {calls:?}"))
+        };
+        assert!(started(&name) < started("verone-work"));
+    }
+
+    #[test]
+    fn starting_an_android_14_phone_never_touches_the_watcher() {
+        let f = Fixture::new(&format!("{NO_CONTAINER}\nexec*) echo 1 ;;"));
+        f.engine(&[]).start(&f.profile, &f.phone).unwrap();
+        assert!(
+            f.stub
+                .calls()
+                .iter()
+                .all(|call| !call.contains("verone-power"))
+        );
+    }
+
+    #[test]
+    fn a_current_watcher_is_never_created_twice() {
+        for (status, start_expected) in [("running", false), ("exited", true)] {
+            let mut f = fixture_with(|f| {
+                format!(
+                    "{}\n{NO_CONTAINER}\nexec*) echo 1 ;;",
+                    watcher_arm(f, status)
+                )
+            });
+            f.profile.android = "12".to_string();
+            f.engine(&[]).start(&f.profile, &f.phone).unwrap();
+            let name = watcher_name(&f);
+            let calls = f.stub.calls();
+            assert!(
+                calls
+                    .iter()
+                    .all(|call| !call.starts_with(&format!("create --name {name}"))),
+                "{calls:?}"
+            );
+            assert!(
+                calls
+                    .iter()
+                    .all(|call| !call.starts_with(&format!("rm --force {name}")))
+            );
+            assert_eq!(
+                calls.contains(&format!("start {name}")),
+                start_expected,
+                "{status}"
+            );
+        }
+    }
+
+    #[test]
+    fn deleting_the_last_android_12_phone_removes_the_watcher() {
+        let f = fixture_with(|f| {
+            format!(
+                "{}\n{}",
+                watcher_arm(f, "running"),
+                inspect_arm("exited", "")
+            )
+        });
+        f.engine(&[]).destroy(f.id()).unwrap();
+        assert!(
+            f.stub
+                .calls()
+                .contains(&format!("rm --force {}", watcher_name(&f)))
+        );
+
+        let f = fixture_with(|f| {
+            format!(
+                "{}\nps*) echo '{ANDROID_12_IMAGE}' ;;\n{}",
+                watcher_arm(f, "running"),
+                inspect_arm("exited", "")
+            )
+        });
+        f.engine(&[]).destroy(f.id()).unwrap();
+        let calls = f.stub.calls();
+        assert!(calls.contains(&"rm --force verone-work".to_string()));
+        assert!(!calls.contains(&format!("rm --force {}", watcher_name(&f))));
+    }
+
+    #[test]
+    fn doctor_reports_the_watcher_only_when_a_phone_needs_it() {
+        let check = |arms: &dyn Fn(&Fixture) -> String| {
+            let f = fixture_with(arms);
+            f.engine(&[])
+                .check_host()
+                .unwrap()
+                .into_iter()
+                .find(|check| check.name == "Power watcher for Android 12")
+        };
+        assert!(check(&|_| String::new()).is_none());
+
+        let missing = check(&|_| format!("ps*) echo '{ANDROID_12_IMAGE}' ;;\n{NO_CONTAINER}"))
+            .expect("a check when an Android 12 phone exists");
+        assert!(missing.detail.contains("not running"), "{missing:?}");
+        assert!(missing.fix.is_some());
+
+        let running = check(&|f| {
+            format!(
+                "ps*) echo '{ANDROID_12_IMAGE}' ;;\n{}",
+                watcher_arm(f, "running")
+            )
+        })
+        .unwrap();
+        assert!(running.detail.contains("is running"), "{running:?}");
     }
 
     #[test]

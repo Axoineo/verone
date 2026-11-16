@@ -10,8 +10,8 @@ use std::path::Path;
 
 use crate::images::HELPER_IMAGE;
 
-/// The watcher's container name.
-pub const WATCHER_NAME: &str = "verone-power";
+/// The start of every watcher's container name, also the script's `$0`.
+pub const WATCHER_PREFIX: &str = "verone-power-";
 
 /// Label that marks Verone's helper containers by role.
 pub const LABEL_ROLE: &str = "io.verone.role";
@@ -102,7 +102,7 @@ impl WatcherSpec {
             "sh".to_string(),
             "-c".to_string(),
             SCRIPT.to_string(),
-            WATCHER_NAME.to_string(),
+            "verone-power".to_string(),
             phones_dir.display().to_string(),
         ];
         command.extend(versions.iter().map(|version| (*version).to_string()));
@@ -116,21 +116,34 @@ impl WatcherSpec {
     /// A short value that changes whenever any part of the spec changes. Stored as
     /// a label so a later start can tell whether the watcher is current.
     pub fn fingerprint(&self) -> String {
-        // FNV-1a, 64 bits: stable across Rust versions, unlike the std hasher.
-        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-        let parts = self
+        fnv(self
             .options
             .iter()
             .chain(std::iter::once(&self.image))
-            .chain(&self.command);
-        for part in parts {
-            for byte in part.bytes().chain(std::iter::once(0)) {
-                hash ^= u64::from(byte);
-                hash = hash.wrapping_mul(0x0100_0000_01b3);
-            }
-        }
-        format!("{hash:016x}")
+            .chain(&self.command)
+            .map(String::as_str))
     }
+}
+
+/// The watcher's container name for a phones folder. Each Verone data folder gets
+/// its own watcher, so a test run with a temporary folder never replaces the one
+/// that watches the user's phones.
+pub fn watcher_name(phones_dir: &Path) -> String {
+    let code = fnv(std::iter::once(phones_dir.display().to_string().as_str()));
+    format!("{WATCHER_PREFIX}{}", &code[..8])
+}
+
+/// FNV-1a, 64 bits, as 16 hex digits: stable across Rust versions, unlike the
+/// std hasher.
+fn fnv<'a>(parts: impl Iterator<Item = &'a str>) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for part in parts {
+        for byte in part.bytes().chain(std::iter::once(0)) {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0100_0000_01b3);
+        }
+    }
+    format!("{hash:016x}")
 }
 
 #[cfg(test)]
@@ -153,6 +166,18 @@ mod tests {
             spec.command[3..],
             ["verone-power", "/home/a/.local/share/verone/phones", "12"]
         );
+    }
+
+    #[test]
+    fn each_phones_folder_gets_its_own_watcher_name() {
+        let a = watcher_name(Path::new("/home/a/.local/share/verone/phones"));
+        assert!(a.starts_with("verone-power-"));
+        assert_eq!(a.len(), "verone-power-".len() + 8);
+        assert_eq!(
+            a,
+            watcher_name(Path::new("/home/a/.local/share/verone/phones"))
+        );
+        assert_ne!(a, watcher_name(Path::new("/tmp/test/phones")));
     }
 
     #[test]
@@ -261,7 +286,7 @@ esac
                 std::env::var("PATH").unwrap_or_default()
             );
             let output = Command::new("sh")
-                .args(["-c", SCRIPT, WATCHER_NAME, phones, "12"])
+                .args(["-c", SCRIPT, "verone-power", phones, "12"])
                 .env("PATH", path)
                 .env("VERONE_PROC", self.proc())
                 .env("VERONE_ONCE", "1")

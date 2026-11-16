@@ -292,6 +292,26 @@ impl Docker {
         }
     }
 
+    /// The image of every container, running or not, that carries a label.
+    pub fn images_with_label(&self, label: &str) -> Result<Vec<String>> {
+        let filter = format!("label={label}");
+        let output = self.runner.run_ok(&self.cmd().args([
+            "ps",
+            "--all",
+            "--filter",
+            &filter,
+            "--format",
+            "{{.Image}}",
+        ]))?;
+        Ok(output
+            .stdout
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .map(str::to_string)
+            .collect())
+    }
+
     /// Runs a program inside a running container and returns its output, whatever
     /// its exit code.
     pub fn exec(&self, name: &str, args: &[&str], timeout: Duration) -> Result<Output> {
