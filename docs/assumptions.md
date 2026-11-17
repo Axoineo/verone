@@ -295,8 +295,11 @@ owner trimmed the system journal; `/` had 1.4 GB free afterwards.
 - Cause, as far as found: the kernel log shows init receiving the request
   ("Got shutdown_command 'reboot,shell' Calling HandlePowerctlMessage()") and then
   logging nothing more; it never starts shutting down. The deeper reason inside
-  Android 12's init was not found. A fix that does not depend on it is designed in
-  `design/android-12-power.md`.
+  Android 12's init was not found. Fixed without it by the power watcher (D-017,
+  `design/android-12-power.md`), tested 2026-11-17: restart from inside brought the
+  phone back in 6.2 s, `verone stop` took 1.2 s with exit code 130. The watcher's
+  cost over 10 minutes with one Android 12 phone: 1.7% of one core on average (peaks
+  up to 26% while it looks for phones every 10 s) and at most 3 MB of memory.
 
 **A-21 partial.** 2026-11-16: the owner's phone, a vivo V2027, connected over USB with
 USB debugging and was reached by `adb` without problems. It runs **Android 12** (API

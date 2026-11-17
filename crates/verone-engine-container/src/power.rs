@@ -25,38 +25,58 @@ pub const ROLE: &str = "power-watcher";
 /// `VERONE_PROC` and `VERONE_ONCE` exist for the unit tests only.
 pub const SCRIPT: &str = r#"PHONES="$1"; shift; VERSIONS=" $* "
 PROC="${VERONE_PROC:-/proc}"
+# Verdicts for processes that start a process namespace: " <pid>=yes|no ".
 known=" "
+# The processes of the phones being watched.
+phones=""
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*"; }
 prop() { nsenter -t "$1" -m -u -i -n -p -r -w /system/bin/getprop "$2" 2>/dev/null; }
-log "watching phones in $PHONES with Android$VERSIONS"
-while :; do
+
+# Looks through every process for phones. Run every 10 seconds, because reading
+# every process each second costs a fifth of a processor core.
+scan() {
+  phones=""
   for status in "$PROC"/[0-9]*/status; do
     pid=${status%/status}; pid=${pid##*/}
-    case "$known" in *" $pid=no "*) continue ;; esac
-    case "$known" in *" $pid=yes "*) ;; *)
-      # A phone is the first process of its own process namespace...
-      first=no
-      while read -r key outer inner deeper; do
-        if [ "$key" = "NSpid:" ]; then
-          [ "$inner" = 1 ] && [ -z "$deeper" ] && first=yes
-          break
-        fi
-      done < "$status" 2>/dev/null
-      [ "$first" = yes ] || continue
-      # ...whose /data is <phones folder>/<id>/data, and whose Android version
-      # is one the watcher acts on.
-      root=$(awk '$5 == "/data" { print $4; exit }' "$PROC/$pid/mountinfo" 2>/dev/null)
-      id=${root%/data}; id=${id##*/}
-      verdict=no
-      case "$root" in */phones/*/data)
-        case "$PHONES/$id/data" in *"$root")
-          case "$VERSIONS" in *" $(prop "$pid" ro.build.version.release) "*) verdict=yes ;; esac ;;
-        esac ;;
-      esac
-      known="$known$pid=$verdict "
-      [ "$verdict" = yes ] || continue
-      log "watching phone $id (process $pid)" ;;
+    case "$known" in
+      *" $pid=no "*) continue ;;
+      *" $pid=yes "*) phones="$phones $pid"; continue ;;
     esac
+    # A phone is the first process of its own process namespace...
+    first=no
+    while read -r key outer inner deeper; do
+      if [ "$key" = "NSpid:" ]; then
+        [ "$inner" = 1 ] && [ -z "$deeper" ] && first=yes
+        break
+      fi
+    done 2>/dev/null < "$status"
+    [ "$first" = yes ] || continue
+    # ...whose /data is <phones folder>/<id>/data, and whose Android version is
+    # one the watcher acts on.
+    root=$(awk '$5 == "/data" { print $4; exit }' "$PROC/$pid/mountinfo" 2>/dev/null)
+    id=${root%/data}; id=${id##*/}
+    verdict=no
+    case "$root" in */phones/*/data)
+      case "$PHONES/$id/data" in *"$root")
+        case "$VERSIONS" in *" $(prop "$pid" ro.build.version.release) "*) verdict=yes ;; esac ;;
+      esac ;;
+    esac
+    known="$known$pid=$verdict "
+    [ "$verdict" = yes ] || continue
+    phones="$phones $pid"
+    log "watching phone $id (process $pid)"
+  done
+}
+
+log "watching phones in $PHONES with Android$VERSIONS"
+tick=0
+while :; do
+  # Look for phones every 10 seconds, and at once when a watched one has ended.
+  rescan=no
+  [ $((tick % 10)) -eq 0 ] && rescan=yes
+  for pid in $phones; do [ -d "$PROC/$pid" ] || rescan=yes; done
+  [ "$rescan" = yes ] && scan
+  for pid in $phones; do
     request=$(prop "$pid" sys.powerctl)
     case "$request" in
       reboot*) action=reboot ;;
@@ -68,6 +88,7 @@ while :; do
     nsenter -t "$pid" -p "$action" -f || log "could not $action process $pid"
   done
   [ -n "$VERONE_ONCE" ] && exit 0
+  tick=$((tick + 1))
   sleep 1
 done
 "#;
