@@ -96,6 +96,17 @@ image `redroid/redroid:14.0.0-latest`):
 - The stock image is a `userdebug` build with test keys, an old-style launcher and no
   setup wizard. A phone-like first boot needs image work (Phases 3 and 5).
 
+Android 12 (`redroid/redroid:12.0.0-latest`, added 2026-11-16 for the benchmark,
+assumption A-22) boots in about 5 s but ignores restart and power-off requests made
+inside Android. The **power watcher** (decision D-017,
+`design/android-12-power.md`) fills that gap: one helper container per Verone data
+folder, `verone-power-<code>`, running a fixed busybox script from
+`crates/verone-engine-container/src/power.rs`. It sees the host's processes, finds
+Verone's Android 12 phones by their `/data` mount, and turns a pending request into the
+real `reboot` system call, so the container ends with 129 or 130 as Android 14 does.
+It is created by `verone start` of an Android 12 phone and removed with the last one.
+Images that need it are marked `power_watcher: true` in `images.rs`.
+
 From the redroid documentation (not yet tested here):
 
 - Images exist for Android 8.1 through 16.

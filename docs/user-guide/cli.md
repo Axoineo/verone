@@ -142,9 +142,11 @@ Docker.
 - **"Power off" inside Android turns the phone back on.** Use `verone stop`.
 - **No Google apps or Play Store.** Install apps from APK files.
 - **Android 14 and 12 only, x86-64 computers, Docker only.**
-- **Android 12: "Restart" and "Power off" inside Android do nothing.** The phone keeps
-  running. Use `verone restart` or `verone stop`. On Android 12 `verone stop` takes about 20 seconds
-  and ends by forcing the phone off; your files were kept in tests.
+- **Android 12 needs a helper to restart and power off.** Android 12 ignores "Restart"
+  and "Power off" chosen inside it. While an Android 12 phone exists, Verone runs a
+  small helper container, `verone-power-<code>`, that carries the request out. It is
+  not a clean shutdown: files are saved to disk, then the phone ends at once, without
+  Android telling its apps first. `verone doctor` shows whether the helper runs.
 - **No sound has been verified.** scrcpy forwards audio on Android 11 and later, but it
   has not been tested with Verone.
 - **Phone data is not encrypted.** See [SECURITY.md](../../SECURITY.md).

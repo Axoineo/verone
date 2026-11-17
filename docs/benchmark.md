@@ -56,9 +56,10 @@ to run the benchmark in two sets:
 Notes:
 
 - **Verone in set A** uses Android 12 support added on 2026-11-16 with the owner's
-  approval (`crates/verone-engine-container/src/images.rs`, assumption A-22). It is
-  expected to fail B1-03 and B1-04 on Android 12 until the restart problem in A-22 is
-  fixed, and the report must say so.
+  approval (`crates/verone-engine-container/src/images.rs`, assumption A-22). Restart
+  and power-off inside Android 12 work through the power watcher (D-017). Plain
+  redroid 12 has no watcher and is expected to fail B1-03 and B1-04. Verone's power-off
+  is abrupt rather than clean, which the report must state against B1-04.
 - Waydroid offers LineageOS images (Android 11 and 13 at the time of writing; to be
   confirmed in A-19), not Android 12. It is in set B only, with its version recorded.
 - The headline numbers in the README come from set A. Set B is published beside it.

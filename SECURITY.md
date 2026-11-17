@@ -15,6 +15,14 @@ virtual-machine engine with real isolation is planned for that purpose.
 hardware-backed keys, strict SELinux) are absent or weakened. A security result
 observed in Verone does not automatically hold on a real phone, in either direction.
 
+**Android 12 phones bring one more privileged helper.** While an Android 12 phone
+exists, Verone runs a small container named `verone-power-<code>` that can see and
+enter every process on the computer, so it can restart or power off Android 12 phones
+when asked from inside (Android 12 ignores those requests itself). It has no network
+and a read-only file system, runs a fixed script from Verone's source, and only acts on
+Verone's own Android 12 phones. It is removed when the last Android 12 phone is
+deleted. Its log is `docker logs verone-power-<code>`.
+
 **Anyone who can use Docker controls your phones.** Membership of the `docker` group is
 equivalent to administrator rights on the computer, and that includes every phone's data.
 
