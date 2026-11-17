@@ -6,6 +6,7 @@ pub mod adb;
 pub mod engine;
 pub mod host;
 pub mod images;
+pub mod power;
 pub mod runtime;
 
 pub use engine::ContainerEngine;

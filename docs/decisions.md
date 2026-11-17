@@ -24,6 +24,8 @@ stop and raise it with the owner.
 | D-013 | 2026-11-14 | The project licence is Apache-2.0, replacing the MIT licence the repository started with. The copyright notice is in `NOTICE`. | accepted |
 | D-014 | 2026-11-14 | Google apps are optional. First-run offers "with Google" or "without Google"; a Google-free phone is a fully supported mode, not a fallback. | accepted |
 | D-015 | 2026-11-14 | Verone collects no usage data. | accepted |
+| D-016 | 2026-11-16 | Progress towards "behave like a phone" is measured with a public, repeatable benchmark (`benchmark.md`) that scores Verone, redroid, the Android Emulator, Cuttlefish and Waydroid against a real phone. It runs at the end of every phase and all results are published, including unfavourable ones. | accepted |
+| D-017 | 2026-11-17 | On Android versions whose init ignores restart and power-off requests (Android 12 today), a small helper container, `verone-power`, notices the request and ends the phone with the same exit codes Android 14 produces. Design: `design/android-12-power.md`. | accepted |
 
 ## Reasons
 
@@ -52,3 +54,17 @@ must not be copied into Verone.
 
 **D-014.** Widens the audience (privacy-minded users, testers who need a clean system)
 and removes the hard dependency on Google's acceptance of the device.
+
+**D-016.** Without a measurement, "behave like a phone" cannot be checked, and claims
+about Verone cannot be shown to others. A search on 2026-11-16 found speed comparisons
+of virtual Android systems but no test that scores them against a real phone, so the
+benchmark is also something new that other projects can use. Every contender is driven
+through `adb`, which keeps the comparison fair. Publishing unfavourable results is what
+makes the favourable ones believable.
+
+**D-017.** Measured on 2026-11-17 (A-22): Android 12's init receives the request and
+does nothing, and the cause was not found. A helper outside the phone can read the
+request and make the real `reboot` system call, which the kernel turns into the same
+exit codes 129 and 130 that Verone already handles for Android 14. It needs no new
+download. The cost is one more privileged container and a shutdown that is abrupt
+(after a `sync`) rather than clean; both are stated in the design.

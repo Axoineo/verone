@@ -341,3 +341,79 @@ fn an_optional_adb_port_is_published_on_the_loopback_address_only() {
     );
     assert_eq!(android_release(&t), "14");
 }
+
+/// Decision D-017: on Android 12 the power watcher carries out restart and power-off
+/// requests made inside Android, which Android 12 itself ignores.
+#[test]
+fn android_12_restart_and_power_off_work_through_the_power_watcher() {
+    if !enabled() {
+        return;
+    }
+    let _guard = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+    let mut t = TestPhone::new("it-android12");
+    t.profile.android = "12".to_string();
+    t.profile.save(&t.phone).unwrap();
+    let id = t.id().clone();
+    let docker = t.engine.docker().clone();
+    let phones_dir = t.storage.phones_dir().canonicalize().unwrap();
+    let watcher = verone_engine_container::power::watcher_name(&phones_dir);
+
+    t.engine.start(&t.profile, &t.phone).unwrap();
+    assert_eq!(android_release(&t), "12");
+    let running = |name: &str| {
+        docker
+            .inspect(name)
+            .unwrap()
+            .is_some_and(|container| container.status == "running")
+    };
+    assert!(
+        running(&watcher),
+        "the watcher runs beside an Android 12 phone"
+    );
+
+    // Shared storage becomes writable a few seconds after boot (A-22).
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while t.exec(&["sh", "-c", "echo kept > /sdcard/marker && echo ok"]) != "ok" {
+        assert!(
+            Instant::now() < deadline,
+            "shared storage never became writable"
+        );
+        thread::sleep(Duration::from_secs(1));
+    }
+
+    // A restart requested inside Android: the phone ends and Docker brings it back.
+    let first_start = docker.inspect(&t.name()).unwrap().unwrap().started_at;
+    let requested = Instant::now();
+    // Android's reboot command waits forever after asking, so its result is ignored.
+    let _ = docker.exec(&t.name(), &["reboot"], Duration::from_secs(20));
+    let deadline = requested + Duration::from_secs(30);
+    loop {
+        let restarted = docker
+            .inspect(&t.name())
+            .unwrap()
+            .is_some_and(|container| container.started_at != first_start);
+        if restarted && t.engine.status(&id).unwrap() == PhoneStatus::Running {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the phone was not back within 30 s of the restart request"
+        );
+        thread::sleep(Duration::from_millis(500));
+    }
+    eprintln!("back after a restart request in {:?}", requested.elapsed());
+    assert_eq!(t.exec(&["cat", "/sdcard/marker"]), "kept");
+
+    // verone stop: Android powers off through the watcher, quickly and with the
+    // power-off exit code, not the runtime's kill.
+    let stopping = Instant::now();
+    t.engine.stop(&id).unwrap();
+    let took = stopping.elapsed();
+    eprintln!("stopped in {took:?}");
+    assert!(took < Duration::from_secs(5), "stop took {took:?}");
+    assert_eq!(docker.inspect(&t.name()).unwrap().unwrap().exit_code, 130);
+
+    // Deleting the last Android 12 phone of this data folder removes its watcher.
+    t.engine.destroy(&id).unwrap();
+    assert!(docker.inspect(&watcher).unwrap().is_none());
+}

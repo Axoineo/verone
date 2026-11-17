@@ -34,7 +34,7 @@ Creates a phone. It is not started, and nothing is downloaded.
 | Option | Default | Meaning |
 |---|---|---|
 | `--name TEXT` | the id | The name shown in windows and lists. |
-| `--android VERSION` | `14` | Android version. Only 14 is available in version 0.1. |
+| `--android VERSION` | `14` | Android version: `14` or `12`. Version 0.1.0 offers 14 only; 12 comes in the next version. |
 | `--size WIDTHxHEIGHT` | `720x1280` | Screen size in pixels, each side from 240 to 4096. |
 | `--dpi NUMBER` | `320` | Screen density, from 72 to 640. |
 | `--graphics auto\|software\|gpu` | `auto` | How the screen is drawn. See "Graphics" below. |
@@ -141,7 +141,12 @@ Docker.
 
 - **"Power off" inside Android turns the phone back on.** Use `verone stop`.
 - **No Google apps or Play Store.** Install apps from APK files.
-- **One Android version (14), x86-64 computers, Docker only.**
+- **Android 14 and 12 only, x86-64 computers, Docker only.**
+- **Android 12 needs a helper to restart and power off.** Android 12 ignores "Restart"
+  and "Power off" chosen inside it. While an Android 12 phone exists, Verone runs a
+  small helper container, `verone-power-<code>`, that carries the request out. It is
+  not a clean shutdown: files are saved to disk, then the phone ends at once, without
+  Android telling its apps first. `verone doctor` shows whether the helper runs.
 - **No sound has been verified.** scrcpy forwards audio on Android 11 and later, but it
   has not been tested with Verone.
 - **Phone data is not encrypted.** See [SECURITY.md](../../SECURITY.md).

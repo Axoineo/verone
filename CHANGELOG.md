@@ -11,6 +11,18 @@ All notable changes to Verone are recorded here. The format follows
 - The Verone logo, in `docs/brand`.
 - `verone --version` shows the logo beside the version when run in a terminal, in
   colour unless `NO_COLOR` is set. Piped or redirected output is unchanged.
+- Android 12 phones: `verone create NAME --android 12`, using
+  `redroid/redroid:12.0.0-latest` pinned by digest. Android 14 stays the default.
+  Android 12 ignores "Restart" and "Power off" chosen inside it, so Verone runs a
+  small helper container, `verone-power-<code>`, while an Android 12 phone exists; it
+  carries those requests out (decision D-017). `verone doctor` reports it.
+- The phone fidelity benchmark design, in `docs/benchmark.md` (decision D-016).
+
+### Fixed
+
+- `verone open` showed no window: scrcpy asks for Opus audio, which the Android
+  images cannot encode, and then gave up. Verone now asks for uncompressed audio
+  unless you pass your own audio option after `--`.
 
 ## [0.1.0] - 2026-11-15
 
