@@ -416,11 +416,23 @@ pub fn open<E: Engine>(env: &Env<E>, tools: &Tools, id: &str, extra: &[String]) 
     let Some((program, leading)) = tools.scrcpy.split_first() else {
         return Err(Error::failed("no screen-mirroring program is configured"));
     };
+    // The redroid images have no Opus audio encoder, scrcpy's default. Without
+    // this, scrcpy's helper inside the phone fails and no window appears.
+    // Uncompressed audio needs no encoder. The user's own audio options win.
+    let audio_chosen = extra
+        .iter()
+        .any(|option| option.starts_with("--audio") || option == "--no-audio");
+    let audio: &[&str] = if audio_chosen {
+        &[]
+    } else {
+        &["--audio-codec=raw"]
+    };
     let cmd = Cmd::new(program)
         .args(leading)
         .arg("--serial")
         .arg(endpoint.to_string())
         .arg(format!("--window-title=Verone – {}", profile.name))
+        .args(audio)
         .args(extra)
         .no_timeout()
         .passthrough();
@@ -1118,7 +1130,20 @@ mod tests {
         );
         assert_eq!(
             f.calls().last().unwrap(),
-            "scrcpy --serial 127.0.0.1:5555 --window-title=Verone – Work phone --no-window --time-limit=5"
+            "scrcpy --serial 127.0.0.1:5555 --window-title=Verone – Work phone --audio-codec=raw --no-window --time-limit=5"
+        );
+
+        // Audio options given by the user replace the default.
+        open(
+            &f.human(),
+            &tools(&adb, stub_scrcpy(&script)),
+            "work",
+            &["--no-audio".to_string()],
+        )
+        .unwrap();
+        assert_eq!(
+            f.calls().last().unwrap(),
+            "scrcpy --serial 127.0.0.1:5555 --window-title=Verone – Work phone --no-audio"
         );
     }
 
